@@ -10,7 +10,8 @@ func main() {
 	kv := simplegokv.NewKVStore()
 	key := "TEST_1"
 	expected := map[string]interface{}{"k": 1}
-	set_error := kv.Set(key, expected, nil)
+	ttl := 10000 //1 second
+	set_error := kv.Set(key, expected, &ttl)
 	if set_error != nil {
 		log.Panic(set_error)
 	}

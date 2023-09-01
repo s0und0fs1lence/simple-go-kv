@@ -16,7 +16,7 @@ type entry struct {
 }
 
 func (e entry) isExpired() bool {
-	return (e.ExpireTime.IsZero() || (!e.ExpireTime.IsZero() && e.ExpireTime.After(time.Now())))
+	return (e.ExpireTime.IsZero() || (!e.ExpireTime.IsZero() && e.ExpireTime.Before(time.Now())))
 }
 
 // dataBase is the map holding the actual data.
