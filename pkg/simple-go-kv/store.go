@@ -15,19 +15,20 @@ type entry struct {
 	Data       []byte
 }
 
-type Database map[string]*entry
+// dataBase is the map holding the actual data.
+type dataBase map[string]*entry
 
 type kvStore struct {
 	ctx       context.Context
 	mutex     *sync.RWMutex
-	dataStore Database
+	dataStore dataBase
 }
 
 func NewKVStore() SimpleKV {
 	return &kvStore{
 		ctx:       context.Background(),
 		mutex:     &sync.RWMutex{},
-		dataStore: make(Database),
+		dataStore: make(dataBase),
 	}
 }
 
