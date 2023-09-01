@@ -9,16 +9,18 @@ import (
 
 func main() {
 	kv := simplegokv.NewKVStore(8)
+
 	flpath := "test.rdb"
-	kv.Load(&flpath)
-	ttl := 1000 //1 second
+	// kv.Load(&flpath)
+	ttl := 10000 //1 second
 	for i := 0; i < ttl; i++ {
 		err := kv.Set(fmt.Sprintf("kv_%d", i), fmt.Sprintf("val_%d", i), &ttl)
 		if err != nil {
 			log.Panic(err)
 		}
 	}
-
+	log.Println(kv.GetEntryCount())
+	// kv.TruncateDatabase()
 	err := kv.Save(&flpath)
 	if err != nil {
 		log.Panic(err)

@@ -2,7 +2,9 @@ package simplegokv
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/gob"
+	"io/ioutil"
 )
 
 // should pass the input, and the output should be a pointer to a object
@@ -24,4 +26,31 @@ func (k kvStore) serialize(value any) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func (k kvStore) compress(in []byte) ([]byte, error) {
+	var compressedData bytes.Buffer
+	gzipWriter := gzip.NewWriter(&compressedData)
+	defer gzipWriter.Close()
+
+	_, err := gzipWriter.Write(in)
+	if err != nil {
+		return nil, err
+	}
+	return compressedData.Bytes(), nil
+}
+
+func (k kvStore) decompress(in []byte) ([]byte, error) {
+	compressedDataReader, err := gzip.NewReader(bytes.NewReader(in))
+	if err != nil {
+		return nil, err
+	}
+	defer compressedDataReader.Close()
+
+	decompressedData, err := ioutil.ReadAll(compressedDataReader)
+	if err != nil {
+		return nil, err
+	}
+
+	return decompressedData, nil
 }

@@ -3,6 +3,7 @@ package simplegokv
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -47,7 +48,7 @@ func NewKVStore(numShards int) SimpleKV {
 	}
 }
 
-func (k *kvStore) Get(key string) ([]byte, bool) {
+func (k kvStore) Get(key string) ([]byte, bool) {
 	shard := k.getShard(key)
 	shard.mutex.RLock()
 	defer shard.mutex.RUnlock()
@@ -58,7 +59,7 @@ func (k *kvStore) Get(key string) ([]byte, bool) {
 	return nil, false
 }
 
-func (k *kvStore) Has(key string) bool {
+func (k kvStore) Has(key string) bool {
 	shard := k.getShard(key)
 	shard.mutex.RLock()
 	defer shard.mutex.RUnlock()
@@ -107,12 +108,37 @@ func (k kvStore) Delete(key string) {
 }
 
 func (k kvStore) TruncateDatabase() {
-	for _, shard := range k.shards {
-		shard.mutex.Lock()
-		for k := range shard.dataStore {
-			delete(shard.dataStore, k)
-		}
-		shard.mutex.Unlock()
-	}
+	var wg sync.WaitGroup
+	for _, sh := range k.shards {
+		wg.Add(1)
+		go func(sh *shard) {
+			defer wg.Done()
+			sh.mutex.Lock()
+			for k := range sh.dataStore {
+				delete(sh.dataStore, k)
+			}
+			sh.mutex.Unlock()
+		}(sh)
 
+	}
+	wg.Wait()
+
+}
+
+func (k kvStore) GetEntryCount() uint32 {
+	var totEntry uint32
+	var wg sync.WaitGroup
+	for _, sh := range k.shards {
+		wg.Add(1)
+		go func(sh *shard) {
+			defer wg.Done()
+			sh.mutex.RLock()
+
+			atomic.AddUint32(&totEntry, uint32(len((sh.dataStore))))
+
+			sh.mutex.RUnlock()
+		}(sh)
+
+	}
+	return totEntry
 }

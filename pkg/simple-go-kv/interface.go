@@ -10,4 +10,5 @@ type SimpleKV interface {
 	Load(filename *string) error
 	Save(filename *string) error
 	TruncateDatabase()
+	GetEntryCount() uint32
 }
