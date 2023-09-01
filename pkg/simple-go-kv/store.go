@@ -1,12 +1,16 @@
 package simplegokv
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	"sync"
 	"time"
 )
+
+var entryPool = sync.Pool{
+	New: func() interface{} {
+		return &entry{}
+	},
+}
 
 // entry is the object stored insided the map.
 // we attach also an expire time field so we can clean up the expired objects
@@ -15,91 +19,100 @@ type entry struct {
 	Data       []byte
 }
 
-func (e entry) isExpired() bool {
-	return (e.ExpireTime.IsZero() || (!e.ExpireTime.IsZero() && e.ExpireTime.After(time.Now())))
+func (e *entry) isNotExpired() bool {
+	return e.ExpireTime.IsZero() || time.Now().Before(e.ExpireTime)
 }
 
 // dataBase is the map holding the actual data.
 type dataBase map[string]*entry
 
 type kvStore struct {
-	ctx       context.Context
-	mutex     *sync.RWMutex
-	dataStore dataBase
+	ctx          context.Context
+	baseFileName string
+	shards       []*shard
 }
 
-func NewKVStore() SimpleKV {
+func NewKVStore(numShards int) SimpleKV {
+	var shards []*shard
+	for i := 0; i < numShards; i++ {
+		shards = append(shards, &shard{
+			dataStore: make(map[string]*entry),
+		})
+	}
+
 	return &kvStore{
-		ctx:       context.Background(),
-		mutex:     &sync.RWMutex{},
-		dataStore: make(dataBase),
+		ctx:          context.Background(),
+		baseFileName: "data.rdb",
+		shards:       shards,
 	}
 }
 
-func (k kvStore) Get(key string) ([]byte, bool) {
-	k.mutex.RLock()
-	e, ok := k.dataStore[key]
-
-	if ok {
-		if e.isExpired() {
-			k.mutex.RUnlock()
-			k.Delete(key)
-			return nil, false
-		}
-		k.mutex.RUnlock()
+func (k *kvStore) Get(key string) ([]byte, bool) {
+	shard := k.getShard(key)
+	shard.mutex.RLock()
+	defer shard.mutex.RUnlock()
+	e, ok := shard.dataStore[key]
+	if ok && e.isNotExpired() {
 		return e.Data, true
 	}
-	k.mutex.RUnlock()
 	return nil, false
 }
 
-func (k kvStore) Has(key string) bool {
-	k.mutex.RLock()
-	defer k.mutex.RUnlock()
-	_, ok := k.dataStore[key]
-	return ok
+func (k *kvStore) Has(key string) bool {
+	shard := k.getShard(key)
+	shard.mutex.RLock()
+	defer shard.mutex.RUnlock()
+	e, ok := shard.dataStore[key]
+	return ok && e.isNotExpired()
 }
 
 func (k kvStore) Set(key string, value any, ttl *int) error {
-	k.mutex.Lock()
-	defer k.mutex.Unlock()
+	shard := k.getShard(key)
+	shard.mutex.Lock()
+	defer shard.mutex.Unlock()
+	e := entryPool.Get().(*entry)
 	bts, err := k.serialize(value)
 	if err != nil {
 		return err
 	}
-	e := entry{Data: bts}
+
+	e.Data = bts
 	if ttl != nil {
 		exp := time.Now().Add(time.Millisecond * time.Duration(*ttl))
 		e.ExpireTime = exp
 	}
-	k.dataStore[key] = &e
+	shard.dataStore[key] = e
+	return nil
+}
+func (k kvStore) setOnLoad(key string, value []byte, ttl time.Time) error {
+	shard := k.getShard(key)
+	shard.mutex.Lock()
+	defer shard.mutex.Unlock()
+
+	e := entry{
+		Data:       value,
+		ExpireTime: ttl,
+	}
+
+	shard.dataStore[key] = &e
 	return nil
 }
 
 func (k kvStore) Delete(key string) {
-	k.mutex.Lock()
-	defer k.mutex.Unlock()
-	delete(k.dataStore, key)
+	shard := k.getShard(key)
+	shard.mutex.Lock()
+	defer shard.mutex.Unlock()
+	delete(shard.dataStore, key)
 
 }
 
-// should pass the input, and the output should be a pointer to a object
-func (k kvStore) Deserialize(input []byte, output interface{}) error {
-	buf := &bytes.Buffer{}
-	buf.Write(input)
-	dec := gob.NewDecoder(buf)
-	err := dec.Decode(output)
-	if err != nil {
-		return err
+func (k kvStore) TruncateDatabase() {
+	for _, shard := range k.shards {
+		shard.mutex.Lock()
+		for k := range shard.dataStore {
+			delete(shard.dataStore, k)
+		}
+		shard.mutex.Unlock()
 	}
-	return nil
-}
-func (k kvStore) serialize(value any) ([]byte, error) {
-	buf := &bytes.Buffer{}
-	enc := gob.NewEncoder(buf)
-	err := enc.Encode(value)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+
 }

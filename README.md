@@ -18,14 +18,15 @@ Here's a list of features and improvements planned for SimpleGoKV. Feel free to 
 - [ ] Provide more examples and documentation.
 - [ ] Optimize performance for high-throughput scenarios.
 - [ ] Add unit tests for critical components.
-- [ ] Add support for shards
-- [ ] Add persistence of the data across reboots
+
 
 ### Completed Features
 
 - [x] Basic key-value storage functionality.
 - [x] Optional time-to-live (TTL) support.
 - [x] Concurrency-safe data access.
+- [x] Add support for shards
+- [X] Add persistence of the data across reboots
 
 If you have ideas for new features or improvements, please open an issue to discuss them or consider contributing by submitting a pull request.
 
