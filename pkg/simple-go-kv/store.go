@@ -15,6 +15,10 @@ type entry struct {
 	Data       []byte
 }
 
+func (e entry) isExpired() bool {
+	return (e.ExpireTime.IsZero() || (!e.ExpireTime.IsZero() && e.ExpireTime.After(time.Now())))
+}
+
 // dataBase is the map holding the actual data.
 type dataBase map[string]*entry
 
@@ -34,13 +38,18 @@ func NewKVStore() SimpleKV {
 
 func (k kvStore) Get(key string) ([]byte, bool) {
 	k.mutex.RLock()
-	defer k.mutex.RUnlock()
 	e, ok := k.dataStore[key]
-	//TODO: add a check if the entry is expired
-	//if the entry is expired, trigger a background clean
+
 	if ok {
+		if e.isExpired() {
+			k.mutex.RUnlock()
+			k.Delete(key)
+			return nil, false
+		}
+		k.mutex.RUnlock()
 		return e.Data, true
 	}
+	k.mutex.RUnlock()
 	return nil, false
 }
 
