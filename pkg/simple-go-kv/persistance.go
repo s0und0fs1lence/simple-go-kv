@@ -46,6 +46,7 @@ func deserializeEntry(data []byte) (serializedEntry, error) {
 // TODO: add single read for entire entry
 // TODO: add decompression logic
 func (k kvStore) Load(filename *string) error {
+	return fmt.Errorf("Load function is currently not implemented")
 	var flName string
 	if filename != nil {
 		flName = *filename
@@ -117,6 +118,8 @@ func (k kvStore) Load(filename *string) error {
 // TODO: try to speed up the process
 // TODO: define a serialization format in some sort of interface, so the deserializer, can use the interface to retrieve the informations
 func (k kvStore) Save(filename *string) error {
+	return fmt.Errorf("Save function is currently not implemented")
+
 	var flName string
 	if filename != nil {
 		flName = *filename

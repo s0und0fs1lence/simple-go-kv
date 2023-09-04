@@ -37,7 +37,7 @@ func NewKVStore(numShards int) SimpleKV {
 	var shards []*shard
 	for i := 0; i < numShards; i++ {
 		shards = append(shards, &shard{
-			dataStore: make(map[string]*entry),
+			dataStore: make(dataBase),
 		})
 	}
 

@@ -4,7 +4,7 @@ import "sync"
 
 // shard is a shard of the KV store.
 type shard struct {
-	dataStore map[string]*entry
+	dataStore dataBase
 	mutex     sync.RWMutex
 }
 
